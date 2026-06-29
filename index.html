@@ -366,6 +366,30 @@
               <input type="number" class="form-input" x-model.number="onboardingVolumePct" step="1" min="60" max="100">
               <span style="font-size:11px;color:var(--text-secondary);">Intensity Day 重量的百分比</span>
             </div>
+
+            <div class="form-group">
+              <label class="form-label">🏆 核心动作起始 5RM (kg)</label>
+              <span style="font-size:11px;color:var(--text-secondary);">填写你能完成 5 次的最大重量，系统自动计算所有训练重量</span>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px;">
+                <div>
+                  <span style="font-size:12px;">深蹲</span>
+                  <input type="number" class="form-input" x-model.number="startingWeights['深蹲']" step="2.5" min="0" placeholder="kg">
+                </div>
+                <div>
+                  <span style="font-size:12px;">卧推</span>
+                  <input type="number" class="form-input" x-model.number="startingWeights['卧推']" step="2.5" min="0" placeholder="kg">
+                </div>
+                <div>
+                  <span style="font-size:12px;">推举</span>
+                  <input type="number" class="form-input" x-model.number="startingWeights['推举']" step="2.5" min="0" placeholder="kg">
+                </div>
+                <div>
+                  <span style="font-size:12px;">硬拉</span>
+                  <input type="number" class="form-input" x-model.number="startingWeights['硬拉']" step="2.5" min="0" placeholder="kg">
+                </div>
+              </div>
+            </div>
+
             <div class="form-group">
               <label class="form-label">训练日偏好</label>
               <div style="display:flex;gap:8px;">
@@ -471,13 +495,15 @@
                           </td>
                           <td style="text-align:center;padding:8px 4px;" x-text="ex.targetSets + '×' + ex.targetReps"></td>
                           <td style="text-align:right;padding:8px 4px;">
-                            <span x-show="ex.targetWeight !== null" style="font-weight:600;"
-                                  x-text="ex.targetWeight + ' kg'"></span>
-                            <input x-show="ex.targetWeight === null && !currentWeekPlan.confirmed"
-                                   type="number" step="2.5" min="0"
-                                   class="form-input" style="width:80px;text-align:right;"
-                                   :placeholder="getExerciseDefaultWeight(ex.name)"
-                                   @change="ex.targetWeight = parseFloat($event.target.value)">
+                            <template x-if="!currentWeekPlan.confirmed">
+                              <input type="number" step="2.5" min="0"
+                                     class="form-input" style="width:80px;text-align:right;"
+                                     :value="ex.targetWeight"
+                                     @change="ex.targetWeight = parseFloat($event.target.value)">
+                            </template>
+                            <template x-if="currentWeekPlan.confirmed">
+                              <span style="font-weight:600;" x-text="(ex.targetWeight || '—') + ' kg'"></span>
+                            </template>
                           </td>
                         </tr>
                       </template>
@@ -919,10 +945,12 @@
             }
           }
 
+          const startingWeights = template.startingWeights || {};
+
           const days = [
-            buildDayPlan(template, 'volume', day1Date, benchIsIntensity, lastIntensityWeights, settings),
-            buildDayPlan(template, 'recovery', day2Date, benchIsIntensity, lastIntensityWeights, settings),
-            buildDayPlan(template, 'intensity', day3Date, benchIsIntensity, lastIntensityWeights, settings)
+            buildDayPlan(template, 'volume', day1Date, benchIsIntensity, lastIntensityWeights, startingWeights, settings),
+            buildDayPlan(template, 'recovery', day2Date, benchIsIntensity, lastIntensityWeights, startingWeights, settings),
+            buildDayPlan(template, 'intensity', day3Date, benchIsIntensity, lastIntensityWeights, startingWeights, settings)
           ];
 
           const lastWeekNumber = lastWeekPlan ? lastWeekPlan.weekNumber : 0;
@@ -935,7 +963,7 @@
           };
         }
 
-        function buildDayPlan(template, dayType, date, benchIsIntensity, lastIntensityWeights, settings) {
+        function buildDayPlan(template, dayType, date, benchIsIntensity, lastIntensityWeights, startingWeights, settings) {
           const exercises = [];
 
           for (const ex of template.exercises) {
@@ -952,21 +980,23 @@
               if (ex.name === '推举' && !benchIsIntensity && slot.isPR) continue;
             }
 
+            // 获取基准重量：优先历史数据，其次 5RM
+            const sw = startingWeights[ex.name];
+            const historyWeight = lastIntensityWeights[ex.name] ? lastIntensityWeights[ex.name].weight : null;
+            const baseWeight = historyWeight || sw;
+
             let targetWeight = null;
             if (slot.isPR) {
-              const last = lastIntensityWeights[ex.name];
-              if (last && last.weight) {
+              if (historyWeight) {
                 const cat = getExerciseCategory(ex.name);
                 const inc = cat === 'lower' ? settings.increments.lowerBody : settings.increments.upperBody;
-                targetWeight = last.increment ? last.weight + inc : last.weight;
+                const last = lastIntensityWeights[ex.name];
+                targetWeight = (last && last.increment) ? historyWeight + inc : historyWeight;
+              } else if (sw) {
+                targetWeight = sw; // Week 1: Intensity Day = 5RM
               }
-            } else if (slot.percentageOf && slot.percentage) {
-              const baseWeight = lastIntensityWeights[ex.name]
-                ? lastIntensityWeights[ex.name].weight
-                : null;
-              if (baseWeight) {
-                targetWeight = Math.round(baseWeight * slot.percentage / 100 / 2.5) * 2.5;
-              }
+            } else if (slot.percentageOf && slot.percentage && baseWeight) {
+              targetWeight = Math.round(baseWeight * slot.percentage / 100 / 2.5) * 2.5;
             }
 
             exercises.push({
@@ -1031,6 +1061,7 @@
         function getDefaultTemplate() {
           return {
             name: '经典德州',
+            startingWeights: { '深蹲': null, '卧推': null, '推举': null, '硬拉': null },
             exercises: [
               { name: '深蹲', category: 'core', slots: [
                 { day: 'volume', sets: 5, reps: 5, percentageOf: 'intensityDay', percentage: 90 },
@@ -1066,6 +1097,7 @@
             historyLogs: [],
             lastWeekSummary: null,
             showOnboarding: false,
+            startingWeights: { '深蹲': null, '卧推': null, '推举': null, '硬拉': null },
             accessoryOptions: [
               { name: '划船', selected: false },
               { name: '高翻', selected: false },
@@ -1081,6 +1113,10 @@
                 this.template = await db.templates.get(id);
               } else {
                 this.template = tmpl;
+              }
+              // 同步模板中的 5RM 数据
+              if (this.template.startingWeights) {
+                this.startingWeights = this.template.startingWeights;
               }
               await this.loadCurrentPlan();
               await this.checkOnboardingNeeded();
@@ -1331,7 +1367,9 @@
 
             async checkOnboardingNeeded() {
               const tmpl = await db.templates.toCollection().first();
-              if (!tmpl || (tmpl.name === '经典德州' && tmpl.exercises.length === 4)) {
+              const hasStartingWeights = tmpl && tmpl.startingWeights
+                && Object.values(tmpl.startingWeights).some(w => w);
+              if (!tmpl || (tmpl.name === '经典德州' && tmpl.exercises.length === 4 && !hasStartingWeights)) {
                 this.showOnboarding = true;
               }
             },
@@ -1356,8 +1394,12 @@
                     }
                   }
                 }
-                await db.templates.update(this.template.id, { exercises: exercises });
+                await db.templates.update(this.template.id, {
+                  exercises: exercises,
+                  startingWeights: JSON.parse(JSON.stringify(this.startingWeights))
+                });
                 this.template.exercises = exercises;
+                this.template.startingWeights = JSON.parse(JSON.stringify(this.startingWeights));
                 await this.saveSettings();
                 this.showOnboarding = false;
                 this.activeTab = 'plan';
