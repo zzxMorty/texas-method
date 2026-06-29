@@ -1,0 +1,13 @@
+{
+  "name": "德州训练法 · 训练追踪",
+  "short_name": "德州训练",
+  "description": "Texas Method 力量训练个人计划与记录",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#f5f5f5",
+  "theme_color": "#cc0000",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}
