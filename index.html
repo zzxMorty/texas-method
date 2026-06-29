@@ -912,6 +912,7 @@
         function generateWeekPlan(template, settings, lastWeekPlan, lastWeekTrainingLogs) {
           const now = new Date();
           const weekStart = now.toISOString().split('T')[0];
+          const dayIdBase = Date.now();
 
           const day1Date = getNextDate(settings.dayPreferences.day1, new Date(Date.now() - 86400000));
           const day2Date = getNextDate(settings.dayPreferences.day2, new Date(day1Date));
@@ -927,9 +928,9 @@
           }
 
           const lastIntensityWeights = {};
-          if (lastWeekPlan && lastWeekTrainingLogs) {
+          if (lastWeekPlan && lastWeekTrainingLogs.length > 0) {
             const lastIntensityDay = lastWeekPlan.days.find(d => d.dayType === 'intensity');
-            if (lastIntensityDay) {
+            if (lastIntensityDay && lastIntensityDay.id) {
               const log = lastWeekTrainingLogs.find(l => l.dayPlanId === lastIntensityDay.id);
               for (const ex of lastIntensityDay.exercises) {
                 if (log) {
@@ -947,11 +948,28 @@
 
           const startingWeights = template.startingWeights || {};
 
-          const days = [
-            buildDayPlan(template, 'volume', day1Date, benchIsIntensity, lastIntensityWeights, startingWeights, settings),
-            buildDayPlan(template, 'recovery', day2Date, benchIsIntensity, lastIntensityWeights, startingWeights, settings),
-            buildDayPlan(template, 'intensity', day3Date, benchIsIntensity, lastIntensityWeights, startingWeights, settings)
-          ];
+          // Build Volume Day first (needed for Recovery Day calculations)
+          const volumeDay = buildDayPlan(template, 'volume', day1Date, benchIsIntensity,
+            lastIntensityWeights, startingWeights, null, settings);
+          volumeDay.id = dayIdBase;
+
+          // Extract Volume Day weights for Recovery Day percentageOf: 'volumeDay'
+          const volumeWeights = {};
+          for (const ex of volumeDay.exercises) {
+            volumeWeights[ex.name] = ex.targetWeight;
+          }
+
+          // Build Recovery Day (uses Volume weights)
+          const recoveryDay = buildDayPlan(template, 'recovery', day2Date, benchIsIntensity,
+            lastIntensityWeights, startingWeights, volumeWeights, settings);
+          recoveryDay.id = dayIdBase + 1;
+
+          // Build Intensity Day
+          const intensityDay = buildDayPlan(template, 'intensity', day3Date, benchIsIntensity,
+            lastIntensityWeights, startingWeights, null, settings);
+          intensityDay.id = dayIdBase + 2;
+
+          const days = [volumeDay, recoveryDay, intensityDay];
 
           const lastWeekNumber = lastWeekPlan ? lastWeekPlan.weekNumber : 0;
           return {
@@ -963,7 +981,7 @@
           };
         }
 
-        function buildDayPlan(template, dayType, date, benchIsIntensity, lastIntensityWeights, startingWeights, settings) {
+        function buildDayPlan(template, dayType, date, benchIsIntensity, lastIntensityWeights, startingWeights, volumeWeights, settings) {
           const exercises = [];
 
           for (const ex of template.exercises) {
@@ -983,7 +1001,10 @@
             // 获取基准重量：优先历史数据，其次 5RM
             const sw = startingWeights[ex.name];
             const historyWeight = lastIntensityWeights[ex.name] ? lastIntensityWeights[ex.name].weight : null;
-            const baseWeight = historyWeight || sw;
+            // percentageOf: 'volumeDay' 使用 Volume Day 的实际重量
+            const vw = volumeWeights ? volumeWeights[ex.name] : null;
+            const baseWeight = (slot.percentageOf === 'volumeDay' && vw) ? vw
+                             : (historyWeight || sw);
 
             let targetWeight = null;
             if (slot.isPR) {
