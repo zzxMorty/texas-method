@@ -281,6 +281,9 @@
             max-width: 280px;
         }
 
+        /* ===== x-cloak ===== */
+        [x-cloak] { display: none !important; }
+
         /* ===== Utility ===== */
         .text-secondary {
             color: var(--text-secondary);
@@ -331,6 +334,49 @@
 <body>
 
     <div x-data="app">
+        <!-- ===== Onboarding Modal ===== -->
+        <div x-show="showOnboarding" x-cloak style="position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:200;display:flex;align-items:center;justify-content:center;">
+          <div class="card" style="max-width:400px;width:90%;max-height:80vh;overflow-y:auto;">
+            <h3 style="margin-bottom:12px;">🏋️ 欢迎使用德州训练法</h3>
+            <p style="font-size:13px;color:var(--text-secondary);margin-bottom:16px;">数据仅存储在本浏览器中，建议定期导出备份。</p>
+            <div class="form-group">
+              <label class="form-label">选择辅助动作（可多选）</label>
+              <div style="display:flex;flex-wrap:wrap;gap:8px;">
+                <template x-for="acc in accessoryOptions" :key="acc.name">
+                  <label style="display:flex;align-items:center;gap:4px;font-size:13px;cursor:pointer;">
+                    <input type="checkbox" x-model="acc.selected">
+                    <span x-text="acc.name"></span>
+                  </label>
+                </template>
+              </div>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Volume Day 百分比 (%)</label>
+              <input type="number" class="form-input" x-model.number="onboardingVolumePct" step="1" min="60" max="100">
+              <span style="font-size:11px;color:var(--text-secondary);">Intensity Day 重量的百分比</span>
+            </div>
+            <div class="form-group">
+              <label class="form-label">训练日偏好</label>
+              <div style="display:flex;gap:8px;">
+                <select class="form-input" x-model.number="settings.dayPreferences.day1" style="flex:1;">
+                  <option value="0">周日</option><option value="1">周一</option><option value="2">周二</option>
+                  <option value="3">周三</option><option value="4">周四</option><option value="5">周五</option><option value="6">周六</option>
+                </select>
+                <select class="form-input" x-model.number="settings.dayPreferences.day2" style="flex:1;">
+                  <option value="0">周日</option><option value="1">周一</option><option value="2">周二</option>
+                  <option value="3">周三</option><option value="4">周四</option><option value="5">周五</option><option value="6">周六</option>
+                </select>
+                <select class="form-input" x-model.number="settings.dayPreferences.day3" style="flex:1;">
+                  <option value="0">周日</option><option value="1">周一</option><option value="2">周二</option>
+                  <option value="3">周三</option><option value="4">周四</option><option value="5">周五</option><option value="6">周六</option>
+                </select>
+              </div>
+              <span style="font-size:11px;color:var(--text-secondary);">Day1/Volume · Day2/Recovery · Day3/Intensity</span>
+            </div>
+            <button type="button" class="btn btn-primary" style="width:100%;margin-top:8px;" @click="completeOnboarding()">开始训练</button>
+          </div>
+        </div>
+
         <!-- ===== View: 计划 ===== -->
         <div class="view" :class="{ 'active': activeTab === 'plan' }">
           <h2 style="padding:8px 0 16px;">📋 训练计划</h2>
@@ -499,11 +545,59 @@
 
         <!-- ===== View: 历史 ===== -->
         <div class="view" :class="{ 'active': activeTab === 'history' }">
-            <div class="empty-state">
-                <div class="empty-icon">&#128220;</div>
-                <div class="empty-title">训练历史</div>
-                <div class="empty-desc">查看过去的训练记录和进步</div>
+            <h2 style="padding:8px 0 16px;">📜 训练历史</h2>
+
+            <div style="display:flex;gap:8px;margin-bottom:16px;">
+              <button type="button" class="btn btn-sm btn-outline" @click="exportData()">📤 导出备份</button>
+              <label class="btn btn-sm btn-outline" style="cursor:pointer;">
+                📥 导入恢复
+                <input type="file" accept=".json" style="display:none;" @change="importData($event)">
+              </label>
             </div>
+
+            <div x-show="historyLogs.length === 0" class="empty-state">
+              <div class="empty-icon">📜</div>
+              <p>暂无训练记录</p>
+            </div>
+
+            <template x-for="log in historyLogs" :key="log.id">
+              <div class="card">
+                <div class="card-header" style="cursor:pointer;" @click="log._expanded = !log._expanded">
+                  <div>
+                    <span style="font-weight:600;" x-text="log.date"></span>
+                    <span class="badge" style="margin-left:8px;"
+                          :class="log._dayType === 'volume' ? 'badge-volume' :
+                                  log._dayType === 'recovery' ? 'badge-recovery' : 'badge-intensity'"
+                          x-text="log._dayType === 'volume' ? 'Volume' :
+                                  log._dayType === 'recovery' ? 'Recovery' : 'Intensity'"></span>
+                  </div>
+                  <div style="font-size:12px;color:var(--text-secondary);">
+                    <span x-text="log._completionRate"></span>
+                    <span x-text="log._expanded ? ' ▲' : ' ▼'"></span>
+                  </div>
+                </div>
+
+                <div x-show="log._expanded" style="border-top:1px solid var(--border);padding-top:8px;margin-top:8px;">
+                  <template x-for="ex in log.exercises" :key="ex.name">
+                    <div style="margin-bottom:8px;">
+                      <div style="font-weight:600;font-size:13px;margin-bottom:4px;" x-text="ex.name"></div>
+                      <template x-for="s in ex.sets" :key="s.setNumber">
+                        <div style="font-size:12px;padding:2px 0;display:flex;gap:8px;align-items:center;">
+                          <span x-text="'组' + s.setNumber + ':'"></span>
+                          <span :style="{color: s.completed ? 'var(--success)' : 'var(--danger)'}"
+                                x-text="s.completed ? '✓' : '✗'"></span>
+                          <span x-text="s.targetWeight + 'kg × ' + (s.completed ? (s.actualReps || s.targetReps) : (s.actualReps || 0))"></span>
+                          <span x-show="s.rpe" style="color:var(--text-secondary);" x-text="'RPE ' + s.rpe"></span>
+                        </div>
+                      </template>
+                    </div>
+                  </template>
+                  <div x-show="log.notes" style="font-size:12px;color:var(--text-secondary);margin-top:8px;padding-top:8px;border-top:1px solid var(--border);">
+                    📝 <span x-text="log.notes"></span>
+                  </div>
+                </div>
+              </div>
+            </template>
         </div>
 
         <!-- ===== View: 设置 ===== -->
@@ -615,7 +709,7 @@
                 <span class="tab-icon">&#127931;&#65039;</span>
                 <span class="tab-label">训练</span>
             </button>
-            <button type="button" class="tab-btn" :class="{ 'active': activeTab === 'history' }" @click="activeTab = 'history'">
+            <button type="button" class="tab-btn" :class="{ 'active': activeTab === 'history' }" @click="activeTab = 'history'; loadHistory()">
                 <span class="tab-icon">&#128220;</span>
                 <span class="tab-label">历史</span>
             </button>
@@ -922,6 +1016,14 @@
             todayDayPlan: null,
             trainingNotes: '',
             exerciseSetsData: [],
+            historyLogs: [],
+            showOnboarding: false,
+            accessoryOptions: [
+              { name: '划船', selected: false },
+              { name: '高翻', selected: false },
+              { name: '引体向上', selected: false }
+            ],
+            onboardingVolumePct: 90,
 
             async init() {
               this.settings = await getSettings();
@@ -933,6 +1035,7 @@
                 this.template = tmpl;
               }
               await this.loadCurrentPlan();
+              await this.checkOnboardingNeeded();
               console.log('App initialized', this.settings, this.template);
             },
 
@@ -1081,6 +1184,95 @@
               }
               alert('训练记录已保存 ✓');
               this.todayDayPlan = null;
+              this.activeTab = 'plan';
+            },
+
+            async loadHistory() {
+              const logs = await db.trainingLogs.orderBy('date').reverse().toArray();
+              for (const log of logs) {
+                if (log._dayType) continue;
+                let dayType = 'intensity';
+                const allPlans = await db.weekPlans.toArray();
+                for (const wp of allPlans) {
+                  const day = wp.days.find(d => d.id === log.dayPlanId);
+                  if (day) { dayType = day.dayType; break; }
+                }
+                log._dayType = dayType;
+                let totalSets = 0, completedSets = 0;
+                for (const ex of log.exercises) {
+                  for (const s of ex.sets) { totalSets++; if (s.completed) completedSets++; }
+                }
+                log._completionRate = completedSets + '/' + totalSets;
+                log._expanded = false;
+              }
+              this.historyLogs = logs;
+            },
+
+            async exportData() {
+              const data = {
+                version: 1, exportedAt: new Date().toISOString(),
+                templates: await db.templates.toArray(),
+                weekPlans: await db.weekPlans.toArray(),
+                trainingLogs: await db.trainingLogs.toArray(),
+                settings: await db.settings.toArray()
+              };
+              const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement('a');
+              a.href = url;
+              a.download = 'texas-method-backup-' + new Date().toISOString().split('T')[0] + '.json';
+              a.click();
+              URL.revokeObjectURL(url);
+            },
+
+            async importData(event) {
+              const file = event.target.files[0];
+              if (!file) return;
+              if (!confirm('导入将覆盖当前全部数据（模板、计划、日志、设置）。确定继续？')) { event.target.value = ''; return; }
+              try {
+                const text = await file.text();
+                const data = JSON.parse(text);
+                if (!data.version || !data.templates || !data.weekPlans || !data.trainingLogs || !data.settings) {
+                  throw new Error('无效的备份文件格式');
+                }
+                await db.templates.clear(); await db.weekPlans.clear();
+                await db.trainingLogs.clear(); await db.settings.clear();
+                await db.templates.bulkAdd(data.templates); await db.weekPlans.bulkAdd(data.weekPlans);
+                await db.trainingLogs.bulkAdd(data.trainingLogs); await db.settings.bulkAdd(data.settings);
+                alert('数据导入成功 ✓ 页面将刷新');
+                location.reload();
+              } catch (e) { alert('导入失败：' + e.message); }
+              event.target.value = '';
+            },
+
+            async checkOnboardingNeeded() {
+              const tmpl = await db.templates.toCollection().first();
+              if (!tmpl || (tmpl.name === '经典德州' && tmpl.exercises.length === 4)) {
+                this.showOnboarding = true;
+              }
+            },
+
+            async completeOnboarding() {
+              const selectedAccessories = this.accessoryOptions.filter(a => a.selected);
+              for (const acc of selectedAccessories) {
+                this.template.exercises.push({
+                  name: acc.name, category: 'accessory',
+                  slots: [
+                    { day: 'volume', sets: 3, reps: 8 },
+                    { day: 'recovery', sets: 3, reps: 10 }
+                  ]
+                });
+              }
+              for (const ex of this.template.exercises) {
+                for (const slot of ex.slots) {
+                  if (slot.day === 'volume' && slot.percentageOf === 'intensityDay') {
+                    slot.percentage = this.onboardingVolumePct;
+                  }
+                }
+              }
+              await db.templates.update(this.template.id, { exercises: this.template.exercises });
+              await this.saveSettings();
+              this.showOnboarding = false;
               this.activeTab = 'plan';
             },
 
