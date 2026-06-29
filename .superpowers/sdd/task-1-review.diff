@@ -1,0 +1,381 @@
+﻿=== Commits ===
+952fa34 feat: add project scaffold with Alpine.js shell and tab navigation
+=== Diff Stat ===
+ index.html | 369 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 369 insertions(+)
+=== Full Diff ===
+diff --git a/index.html b/index.html
+new file mode 100644
+index 0000000..bee680d
+--- /dev/null
++++ b/index.html
+@@ -0,0 +1,369 @@
++<!DOCTYPE html>
++<html lang="zh-CN">
++<head>
++    <meta charset="UTF-8">
++    <meta name="viewport" content="width=device-width, initial-scale=1.0">
++    <meta name="theme-color" content="#1a1a2e">
++    <link rel="manifest" href="/manifest.json">
++    <title>德州训练法 · 训练追踪</title>
++    <style>
++        /* ===== CSS Custom Properties ===== */
++        :root {
++            --bg: #f5f5f5;
++            --surface: #ffffff;
++            --text: #1a1a2e;
++            --text-secondary: #666;
++            --primary: #cc0000;
++            --primary-light: #ff4444;
++            --success: #2ecc71;
++            --danger: #e74c3c;
++            --border: #e0e0e0;
++            --radius: 12px;
++            --shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
++            --nav-height: 64px;
++        }
++
++        /* ===== Reset ===== */
++        *, *::before, *::after {
++            margin: 0;
++            padding: 0;
++            box-sizing: border-box;
++        }
++
++        body {
++            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans SC", sans-serif;
++            background: var(--bg);
++            color: var(--text);
++            max-width: 800px;
++            margin: 0 auto;
++            min-height: 100dvh;
++            position: relative;
++            padding-bottom: var(--nav-height);
++            -webkit-font-smoothing: antialiased;
++            -moz-osx-font-smoothing: grayscale;
++        }
++
++        /* ===== Bottom Tab Navigation ===== */
++        .tab-nav {
++            position: fixed;
++            bottom: 0;
++            left: 50%;
++            transform: translateX(-50%);
++            width: 100%;
++            max-width: 800px;
++            height: var(--nav-height);
++            background: var(--surface);
++            border-top: 1px solid var(--border);
++            display: flex;
++            justify-content: space-around;
++            align-items: center;
++            z-index: 100;
++            box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.05);
++        }
++
++        .tab-btn {
++            display: flex;
++            flex-direction: column;
++            align-items: center;
++            justify-content: center;
++            gap: 2px;
++            background: none;
++            border: none;
++            cursor: pointer;
++            color: var(--text-secondary);
++            font-size: 11px;
++            padding: 4px 12px;
++            transition: color 0.2s ease;
++            -webkit-tap-highlight-color: transparent;
++            user-select: none;
++        }
++
++        .tab-btn .tab-icon {
++            font-size: 22px;
++            line-height: 1;
++        }
++
++        .tab-btn .tab-label {
++            font-size: 11px;
++            line-height: 1.2;
++        }
++
++        .tab-btn.active {
++            color: var(--primary);
++        }
++
++        .tab-btn.active .tab-icon {
++            color: var(--primary);
++        }
++
++        /* ===== View Container ===== */
++        .view {
++            display: none;
++            padding: 16px;
++            animation: fadeIn 0.2s ease;
++        }
++
++        .view.active {
++            display: block;
++        }
++
++        @keyframes fadeIn {
++            from { opacity: 0; }
++            to   { opacity: 1; }
++        }
++
++        /* ===== Card Component ===== */
++        .card {
++            background: var(--surface);
++            border-radius: var(--radius);
++            padding: 16px;
++            margin-bottom: 12px;
++            box-shadow: var(--shadow);
++        }
++
++        .card-header {
++            display: flex;
++            justify-content: space-between;
++            align-items: center;
++            margin-bottom: 12px;
++        }
++
++        .card-header h2,
++        .card-header h3,
++        .card-title {
++            font-size: 16px;
++            font-weight: 600;
++        }
++
++        .card-body {
++            font-size: 14px;
++            color: var(--text);
++            line-height: 1.6;
++        }
++
++        /* ===== Badge Styles ===== */
++        .badge {
++            display: inline-flex;
++            align-items: center;
++            padding: 2px 10px;
++            border-radius: 20px;
++            font-size: 12px;
++            font-weight: 600;
++            color: #fff;
++        }
++
++        .badge-volume {
++            background: var(--primary);
++        }
++
++        .badge-recovery {
++            background: #2196f3;
++        }
++
++        .badge-intensity {
++            background: #9c27b0;
++        }
++
++        /* ===== Button Styles ===== */
++        .btn {
++            display: inline-flex;
++            align-items: center;
++            justify-content: center;
++            gap: 6px;
++            padding: 10px 20px;
++            border: 1px solid var(--border);
++            border-radius: var(--radius);
++            background: var(--surface);
++            color: var(--text);
++            font-size: 14px;
++            font-weight: 500;
++            cursor: pointer;
++            transition: all 0.15s ease;
++            -webkit-tap-highlight-color: transparent;
++            user-select: none;
++        }
++
++        .btn:hover {
++            opacity: 0.85;
++        }
++
++        .btn:active {
++            transform: scale(0.97);
++        }
++
++        .btn-primary {
++            background: var(--primary);
++            color: #fff;
++            border-color: var(--primary);
++        }
++
++        .btn-primary:hover {
++            background: var(--primary-light);
++            border-color: var(--primary-light);
++        }
++
++        .btn-outline {
++            background: transparent;
++            border: 1px solid var(--primary);
++            color: var(--primary);
++        }
++
++        .btn-outline:hover {
++            background: rgba(204, 0, 0, 0.05);
++        }
++
++        .btn-sm {
++            padding: 6px 14px;
++            font-size: 13px;
++        }
++
++        /* ===== Form Styles ===== */
++        .form-group {
++            margin-bottom: 16px;
++        }
++
++        .form-label {
++            display: block;
++            font-size: 14px;
++            font-weight: 500;
++            color: var(--text);
++            margin-bottom: 6px;
++        }
++
++        .form-input {
++            width: 100%;
++            padding: 10px 14px;
++            border: 1px solid var(--border);
++            border-radius: var(--radius);
++            font-size: 15px;
++            color: var(--text);
++            background: var(--surface);
++            transition: border-color 0.2s ease;
++            outline: none;
++        }
++
++        .form-input:focus {
++            border-color: var(--primary);
++            box-shadow: 0 0 0 2px rgba(204, 0, 0, 0.1);
++        }
++
++        .form-input::placeholder {
++            color: var(--text-secondary);
++        }
++
++        /* ===== Empty State ===== */
++        .empty-state {
++            display: flex;
++            flex-direction: column;
++            align-items: center;
++            justify-content: center;
++            padding: 48px 24px;
++            text-align: center;
++            color: var(--text-secondary);
++        }
++
++        .empty-state .empty-icon {
++            font-size: 48px;
++            margin-bottom: 16px;
++            opacity: 0.5;
++        }
++
++        .empty-state .empty-title {
++            font-size: 18px;
++            font-weight: 600;
++            color: var(--text);
++            margin-bottom: 8px;
++        }
++
++        .empty-state .empty-desc {
++            font-size: 14px;
++            line-height: 1.5;
++            max-width: 280px;
++        }
++
++        /* ===== Utility ===== */
++        .text-secondary {
++            color: var(--text-secondary);
++        }
++    </style>
++</head>
++<body>
++
++    <div x-data="app">
++        <!-- ===== View: 计划 ===== -->
++        <div class="view" :class="{ 'active': activeTab === 'plan' }">
++            <div class="empty-state">
++                <div class="empty-icon">&#128203;</div>
++                <div class="empty-title">训练计划</div>
++                <div class="empty-desc">在这里创建和管理你的德州训练法计划</div>
++            </div>
++        </div>
++
++        <!-- ===== View: 训练 ===== -->
++        <div class="view" :class="{ 'active': activeTab === 'workout' }">
++            <div class="empty-state">
++                <div class="empty-icon">&#127931;&#65039;</div>
++                <div class="empty-title">当前训练</div>
++                <div class="empty-desc">开始今天的力量训练</div>
++            </div>
++        </div>
++
++        <!-- ===== View: 历史 ===== -->
++        <div class="view" :class="{ 'active': activeTab === 'history' }">
++            <div class="empty-state">
++                <div class="empty-icon">&#128220;</div>
++                <div class="empty-title">训练历史</div>
++                <div class="empty-desc">查看过去的训练记录和进步</div>
++            </div>
++        </div>
++
++        <!-- ===== View: 设置 ===== -->
++        <div class="view" :class="{ 'active': activeTab === 'settings' }">
++            <div class="empty-state">
++                <div class="empty-icon">&#9881;&#65039;</div>
++                <div class="empty-title">设置</div>
++                <div class="empty-desc">配置个人信息和训练偏好</div>
++            </div>
++        </div>
++
++        <!-- ===== Bottom Tab Navigation ===== -->
++        <nav class="tab-nav">
++            <button class="tab-btn" :class="{ 'active': activeTab === 'plan' }" @click="activeTab = 'plan'">
++                <span class="tab-icon">&#128203;</span>
++                <span class="tab-label">计划</span>
++            </button>
++            <button class="tab-btn" :class="{ 'active': activeTab === 'workout' }" @click="activeTab = 'workout'">
++                <span class="tab-icon">&#127931;&#65039;</span>
++                <span class="tab-label">训练</span>
++            </button>
++            <button class="tab-btn" :class="{ 'active': activeTab === 'history' }" @click="activeTab = 'history'">
++                <span class="tab-icon">&#128220;</span>
++                <span class="tab-label">历史</span>
++            </button>
++            <button class="tab-btn" :class="{ 'active': activeTab === 'settings' }" @click="activeTab = 'settings'">
++                <span class="tab-icon">&#9881;&#65039;</span>
++                <span class="tab-label">设置</span>
++            </button>
++        </nav>
++    </div>
++
++    <!-- Dexie.js (IndexedDB wrapper) -->
++    <script src="https://unpkg.com/dexie@4.0.8/dist/dexie.js"></script>
++
++    <!-- Alpine.js -->
++    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.1/dist/cdn.min.js"></script>
++
++    <!-- App initialization -->
++    <script>
++        document.addEventListener('alpine:init', () => {
++            Alpine.data('app', () => ({
++                activeTab: 'plan',
++                async init() {
++                    console.log('App initialized');
++                }
++            }));
++        });
++    </script>
++
++</body>
++</html>
