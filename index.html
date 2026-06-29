@@ -411,11 +411,90 @@
 
         <!-- ===== View: 训练 ===== -->
         <div class="view" :class="{ 'active': activeTab === 'train' }">
-            <div class="empty-state">
-                <div class="empty-icon">&#127931;&#65039;</div>
-                <div class="empty-title">当前训练</div>
-                <div class="empty-desc">开始今天的力量训练</div>
+            <h2 style="padding:8px 0 16px;">🏋️ 今日训练</h2>
+
+            <div x-show="!todayDayPlan" class="empty-state">
+              <div class="empty-icon">🏋️</div>
+              <p x-show="!currentWeekPlan" style="margin-bottom:12px;">还没有训练计划</p>
+              <p x-show="currentWeekPlan && currentWeekPlan.completed" style="margin-bottom:12px;">本周训练已全部完成 🎉</p>
+              <p x-show="currentWeekPlan && !currentWeekPlan.completed && !todayDayPlan" style="margin-bottom:12px;">今天没有安排训练</p>
+              <button type="button" class="btn btn-primary" @click="goToPlan()"
+                      x-show="!currentWeekPlan || currentWeekPlan.completed">去计划页</button>
             </div>
+
+            <template x-if="todayDayPlan">
+              <div>
+                <div class="card" style="margin-bottom:16px;">
+                  <span class="badge"
+                        :class="{ 'badge-volume': todayDayPlan.dayType === 'volume',
+                                  'badge-recovery': todayDayPlan.dayType === 'recovery',
+                                  'badge-intensity': todayDayPlan.dayType === 'intensity' }"
+                        x-text="todayDayPlan.dayType === 'volume' ? 'Volume 高量日' :
+                                todayDayPlan.dayType === 'recovery' ? 'Recovery 恢复日' : 'Intensity 冲强度日'"></span>
+                  <span style="margin-left:8px;font-size:14px;" x-text="todayDayPlan.date"></span>
+                </div>
+
+                <template x-for="(ex, ei) in todayDayPlan.exercises" :key="ei">
+                  <div class="card">
+                    <div style="display:flex;gap:16px;flex-wrap:wrap;">
+                      <div style="flex:1;min-width:200px;">
+                        <div class="card-header">
+                          <span class="card-title" x-text="ex.name"></span>
+                          <span x-show="ex.isPR" style="color:var(--primary);">🏆 PR</span>
+                        </div>
+                        <div style="font-size:13px;color:var(--text-secondary);margin-bottom:8px;">
+                          <span x-text="ex.targetSets + '×' + ex.targetReps + ' @ ' + ex.targetWeight + 'kg'"></span>
+                        </div>
+
+                        <div x-show="ex.plateResult" style="margin-bottom:8px;">
+                          <span style="font-size:12px;color:var(--text-secondary);">
+                            配片：<span x-text="formatPlateList(ex.plateResult.perSide)"></span>
+                          </span>
+                        </div>
+
+                        <template x-for="(set, si) in getExerciseSets(ei)" :key="si">
+                          <div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-top:1px solid var(--border);">
+                            <span style="font-size:12px;min-width:36px;" x-text="'组' + (si + 1)"></span>
+                            <button type="button" class="btn btn-sm"
+                                    :style="{ background: set.completed ? 'var(--success)' : 'var(--danger)', color:'#fff' }"
+                                    @click="toggleSet(ei, si)">
+                              <span x-text="set.completed ? '✓' : '✗'"></span>
+                            </button>
+                            <span style="font-size:13px;min-width:60px;" x-text="ex.targetWeight + 'kg × ' + ex.targetReps"></span>
+                            <input type="number" class="form-input" style="width:50px;padding:4px;font-size:13px;"
+                                   x-model.number="set.actualReps" min="0" :placeholder="ex.targetReps">
+                            <span style="font-size:11px;color:var(--text-secondary);">次</span>
+                            <select class="form-input" style="width:54px;padding:4px;font-size:11px;" x-model.number="set.rpe">
+                              <option value="">RPE</option>
+                              <option value="6">6</option><option value="6.5">6.5</option>
+                              <option value="7">7</option><option value="7.5">7.5</option>
+                              <option value="8">8</option><option value="8.5">8.5</option>
+                              <option value="9">9</option><option value="9.5">9.5</option>
+                              <option value="10">10</option>
+                            </select>
+                          </div>
+                        </template>
+                      </div>
+
+                      <div x-show="settings.ui.showBarbellPreview && ex.barbellHTML"
+                           x-html="ex.barbellHTML"
+                           style="flex:0 0 auto;min-width:280px;">
+                      </div>
+                    </div>
+                  </div>
+                </template>
+
+                <div class="card">
+                  <div class="form-group">
+                    <label class="form-label">训练备注（感受、状态等）</label>
+                    <textarea class="form-input" rows="2" x-model="trainingNotes" placeholder="可选..."></textarea>
+                  </div>
+                  <button type="button" class="btn btn-primary" style="width:100%;" @click="saveTrainingLog()">
+                    ✅ 完成训练
+                  </button>
+                </div>
+              </div>
+            </template>
         </div>
 
         <!-- ===== View: 历史 ===== -->
@@ -532,7 +611,7 @@
                 <span class="tab-icon">&#128203;</span>
                 <span class="tab-label">计划</span>
             </button>
-            <button type="button" class="tab-btn" :class="{ 'active': activeTab === 'train' }" @click="activeTab = 'train'">
+            <button type="button" class="tab-btn" :class="{ 'active': activeTab === 'train' }" @click="activeTab = 'train'; loadTodayTraining()">
                 <span class="tab-icon">&#127931;&#65039;</span>
                 <span class="tab-label">训练</span>
             </button>
@@ -840,6 +919,9 @@
             template: null,
             currentWeekPlan: null,
             trainingLogs: [],
+            todayDayPlan: null,
+            trainingNotes: '',
+            exerciseSetsData: [],
 
             async init() {
               this.settings = await getSettings();
@@ -919,7 +1001,90 @@
             async loadCurrentPlan() {
               const plans = await db.weekPlans.orderBy('weekNumber').reverse().toArray();
               this.currentWeekPlan = plans.find(p => !p.completed) || (plans.length > 0 ? plans[0] : null);
-            }
+            },
+
+            async loadTodayTraining() {
+              this.todayDayPlan = null;
+              this.exerciseSetsData = [];
+              this.trainingNotes = '';
+              if (!this.currentWeekPlan || !this.currentWeekPlan.confirmed) return;
+              const today = new Date().toISOString().split('T')[0];
+              let targetDay = null;
+              for (const day of this.currentWeekPlan.days) {
+                const existingLog = await db.trainingLogs.where('dayPlanId').equals(day.id).first();
+                if (existingLog) continue;
+                if (day.date === today) { targetDay = day; break; }
+              }
+              if (!targetDay) {
+                for (const day of this.currentWeekPlan.days) {
+                  const existingLog = await db.trainingLogs.where('dayPlanId').equals(day.id).first();
+                  if (!existingLog) { targetDay = day; break; }
+                }
+              }
+              if (!targetDay) return;
+              this.todayDayPlan = targetDay;
+              for (let i = 0; i < targetDay.exercises.length; i++) {
+                const ex = targetDay.exercises[i];
+                const sets = [];
+                for (let s = 0; s < ex.targetSets; s++) {
+                  sets.push({ completed: true, actualReps: ex.targetReps, rpe: null, notes: '' });
+                }
+                this.exerciseSetsData.push({ exerciseIndex: i, sets: sets });
+                if (ex.targetWeight) {
+                  const result = calculatePlates(ex.targetWeight, this.settings.barbell.barWeight,
+                    this.settings.barbell.availablePlates);
+                  ex.plateResult = result;
+                  ex.barbellHTML = renderBarbellHTML(ex.targetWeight, this.settings.barbell.barWeight,
+                    this.settings.barbell.barColor, result);
+                }
+              }
+            },
+
+            getExerciseSets(ei) {
+              const data = this.exerciseSetsData.find(d => d.exerciseIndex === ei);
+              return data ? data.sets : [];
+            },
+
+            toggleSet(ei, si) {
+              const data = this.exerciseSetsData.find(d => d.exerciseIndex === ei);
+              if (data) { data.sets[si].completed = !data.sets[si].completed; }
+            },
+
+            async saveTrainingLog() {
+              if (!this.todayDayPlan) return;
+              const loggedExercises = this.todayDayPlan.exercises.map((ex, i) => {
+                const data = this.exerciseSetsData.find(d => d.exerciseIndex === i);
+                return {
+                  name: ex.name,
+                  sets: (data ? data.sets : []).map((s, si) => ({
+                    setNumber: si + 1, targetWeight: ex.targetWeight, targetReps: ex.targetReps,
+                    actualReps: s.completed ? (s.actualReps || ex.targetReps) : (s.actualReps || 0),
+                    completed: s.completed, rpe: s.rpe || null, notes: s.notes || ''
+                  }))
+                };
+              });
+              const log = {
+                dayPlanId: this.todayDayPlan.id, date: new Date().toISOString().split('T')[0],
+                exercises: loggedExercises, notes: this.trainingNotes
+              };
+              await db.trainingLogs.add(log);
+              const weekDays = this.currentWeekPlan.days;
+              let allDone = true;
+              for (const day of weekDays) {
+                const existingLog = await db.trainingLogs.where('dayPlanId').equals(day.id).first();
+                if (day.id === this.todayDayPlan.id) continue;
+                if (!existingLog) { allDone = false; break; }
+              }
+              if (allDone) {
+                await db.weekPlans.update(this.currentWeekPlan.id, { completed: true });
+                this.currentWeekPlan.completed = true;
+              }
+              alert('训练记录已保存 ✓');
+              this.todayDayPlan = null;
+              this.activeTab = 'plan';
+            },
+
+            goToPlan() { this.activeTab = 'plan'; }
           }));
         });
     </script>
