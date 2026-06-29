@@ -1060,13 +1060,14 @@
             },
 
             async saveSettings() {
+              const clean = JSON.parse(JSON.stringify(this.settings));
+              delete clean.id;
               const s = await db.settings.toCollection().first();
               if (s) {
-                await db.settings.update(s.id, JSON.parse(JSON.stringify(this.settings)));
+                await db.settings.update(s.id, clean);
               } else {
-                await db.settings.add(JSON.parse(JSON.stringify(this.settings)));
+                await db.settings.add(clean);
               }
-              alert('设置已保存 ✓');
             },
 
             async resetSettings() {
@@ -1273,27 +1274,34 @@
             },
 
             async completeOnboarding() {
-              const selectedAccessories = this.accessoryOptions.filter(a => a.selected);
-              for (const acc of selectedAccessories) {
-                this.template.exercises.push({
-                  name: acc.name, category: 'accessory',
-                  slots: [
-                    { day: 'volume', sets: 3, reps: 8 },
-                    { day: 'recovery', sets: 3, reps: 10 }
-                  ]
-                });
-              }
-              for (const ex of this.template.exercises) {
-                for (const slot of ex.slots) {
-                  if (slot.day === 'volume' && slot.percentageOf === 'intensityDay') {
-                    slot.percentage = this.onboardingVolumePct;
+              try {
+                const selectedAccessories = this.accessoryOptions.filter(a => a.selected);
+                const exercises = JSON.parse(JSON.stringify(this.template.exercises));
+                for (const acc of selectedAccessories) {
+                  exercises.push({
+                    name: acc.name, category: 'accessory',
+                    slots: [
+                      { day: 'volume', sets: 3, reps: 8 },
+                      { day: 'recovery', sets: 3, reps: 10 }
+                    ]
+                  });
+                }
+                for (const ex of exercises) {
+                  for (const slot of ex.slots) {
+                    if (slot.day === 'volume' && slot.percentageOf === 'intensityDay') {
+                      slot.percentage = this.onboardingVolumePct;
+                    }
                   }
                 }
+                await db.templates.update(this.template.id, { exercises: exercises });
+                this.template.exercises = exercises;
+                await this.saveSettings();
+                this.showOnboarding = false;
+                this.activeTab = 'plan';
+              } catch (e) {
+                alert('操作失败：' + e.message + '\n请打开浏览器控制台查看详情');
+                console.error('completeOnboarding error:', e);
               }
-              await db.templates.update(this.template.id, { exercises: this.template.exercises });
-              await this.saveSettings();
-              this.showOnboarding = false;
-              this.activeTab = 'plan';
             },
 
             goToPlan() { this.activeTab = 'plan'; }
