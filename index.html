@@ -300,45 +300,66 @@
             color: var(--text-secondary);
         }
 
-        /* ===== Barbell Visualization ===== */
-        .barbell-container {
+        /* ===== Barbell Visualization (left side close-up) ===== */
+        .barbell-wrap {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          padding: 4px 0;
+        }
+        .barbell-row {
           display: flex;
           align-items: center;
-          justify-content: center;
-          padding: 12px 0;
-          gap: 0;
-          overflow-x: auto;
-          max-width: 100%;
         }
-        .barbell-plate-group {
+        .barbell-plates {
           display: flex;
           flex-direction: row-reverse;
           align-items: center;
+          gap: 0;
         }
-        .barbell-plate {
-          border-radius: 4px;
-          border: 1.5px solid rgba(0,0,0,0.2);
+        .barbell-plate-block {
+          position: relative;
+          border-radius: 3px;
           flex-shrink: 0;
-        }
-        .barbell-bar {
-          height: 12px;
-          border-radius: 6px;
-          flex-shrink: 0;
-          min-width: 80px;
-        }
-        .barbell-collar {
-          width: 6px;
-          height: 32px;
-          background: #C0C0C0;
-          border-radius: 2px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 10px;
+          font-weight: 700;
+          color: #fff;
+          text-shadow: 0 1px 2px rgba(0,0,0,0.5);
           border: 1px solid rgba(0,0,0,0.2);
-          flex-shrink: 0;
+          margin-left: -1px;
         }
-        .barbell-label {
-          text-align: center;
-          font-size: 12px;
+        .barbell-collar-block {
+          width: 7px;
+          height: 40px;
+          background: linear-gradient(180deg, #eee 0%, #bbb 30%, #ddd 50%, #aaa 70%, #ccc 100%);
+          border-radius: 2px;
+          flex-shrink: 0;
+          border: 1px solid rgba(0,0,0,0.2);
+          margin-left: -2px;
+        }
+        .barbell-bar-end {
+          height: 12px;
+          background: var(--primary);
+          border-radius: 0 6px 6px 0;
+          flex-shrink: 0;
+          min-width: 120px;
+          border: 1px solid rgba(0,0,0,0.1);
+          border-left: none;
+          margin-left: -1px;
+        }
+        .barbell-info {
+          font-size: 11px;
           color: var(--text-secondary);
-          margin-top: 4px;
+          margin-top: 6px;
+          text-align: center;
+          line-height: 1.4;
+        }
+        .barbell-info strong {
+          color: var(--text);
+          font-size: 12px;
         }
     </style>
 </head>
@@ -349,18 +370,7 @@
         <div x-show="showOnboarding" x-cloak style="position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:200;display:flex;align-items:center;justify-content:center;">
           <div class="card" style="max-width:400px;width:90%;max-height:80vh;overflow-y:auto;">
             <h3 style="margin-bottom:12px;">🏋️ 欢迎使用德州训练法</h3>
-            <p style="font-size:13px;color:var(--text-secondary);margin-bottom:16px;">数据仅存储在本浏览器中，建议定期导出备份。</p>
-            <div class="form-group">
-              <label class="form-label">选择辅助动作（可多选）</label>
-              <div style="display:flex;flex-wrap:wrap;gap:8px;">
-                <template x-for="acc in accessoryOptions" :key="acc.name">
-                  <label style="display:flex;align-items:center;gap:4px;font-size:13px;cursor:pointer;">
-                    <input type="checkbox" x-model="acc.selected">
-                    <span x-text="acc.name"></span>
-                  </label>
-                </template>
-              </div>
-            </div>
+            <p style="font-size:13px;color:var(--text-secondary);margin-bottom:16px;">五大核心动作：深蹲 · 卧推 · 推举 · 硬拉 · 划船</p>
             <div class="form-group">
               <label class="form-label">Volume Day 百分比 (%)</label>
               <input type="number" class="form-input" x-model.number="onboardingVolumePct" step="1" min="60" max="100">
@@ -842,13 +852,27 @@
           function backtrack(current, rem, plates, idx) {
             if (rem < 0) return;
             if (rem < 0.005) {
-              if (!best || current.length < best.combination.length) {
+              if (!best || best.remainder > 0) {
                 best = { combination: [...current], remainder: 0 };
+              } else if (current.length < best.combination.length) {
+                best = { combination: [...current], remainder: 0 };
+              } else if (current.length === best.combination.length) {
+                // 同数量优先用大片
+                const curMin = Math.min(...current);
+                const bestMin = Math.min(...best.combination);
+                if (curMin > bestMin) {
+                  best = { combination: [...current], remainder: 0 };
+                }
               }
               return;
             }
             if (idx >= plates.length) return;
-            if (best && current.length >= best.combination.length) return;
+            // 剪枝：当前数量已超最佳且非空
+            if (best && best.remainder === 0 && current.length >= best.combination.length) {
+              const curMin = current.length > 0 ? Math.min(...current) : 0;
+              const bestMin = Math.min(...best.combination);
+              if (current.length > best.combination.length || curMin <= bestMin) return;
+            }
             current.push(plates[idx]);
             backtrack(current, Math.round((rem - plates[idx]) * 1000) / 1000, plates, idx);
             current.pop();
@@ -863,39 +887,39 @@
 
         // ===== BarbellRenderer =====
         function renderBarbellHTML(targetWeight, barWeight, barColor, plateResult) {
-          if (!targetWeight || targetWeight <= 0) return '<div class="barbell-label">请先设置目标重量</div>';
+          if (!targetWeight || targetWeight <= 0) return '<div class="barbell-info">请先设置目标重量</div>';
           const { perSide } = plateResult;
-          const BAR_LENGTH = 140;
-          const PLATE_BASE_HEIGHT = 60;
-          const PLATE_BASE_WIDTH = 10;
-
-          function buildPlateSide(plates) {
-            if (!plates || plates.length === 0) return '';
-            const sorted = [...plates].sort((a, b) => a.weight - b.weight);
-            let html = '';
-            for (const plate of sorted) {
-              const h = Math.round(plate.diameterRatio * PLATE_BASE_HEIGHT);
-              const w = Math.round((plate.thicknessRatio || 0.5) * PLATE_BASE_WIDTH);
-              const color = plate.color;
-              html += `<div class="barbell-plate" style="
-                height:${h}px;width:${w}px;background:${color};
-              " title="${plate.weight}kg"></div>`;
-            }
-            return html;
+          if (!perSide || perSide.length === 0) {
+            return `<div class="barbell-wrap">
+              <div class="barbell-row">
+                <div class="barbell-bar-end" style="background:${barColor};min-width:160px;"></div>
+              </div>
+              <div class="barbell-info"><strong>${targetWeight}kg</strong> · 空杆</div>
+            </div>`;
           }
-
-          const leftPlates = buildPlateSide(perSide);
-          const rightPlates = buildPlateSide([...perSide].reverse());
-
+          const MAX_H = 64;
+          const MAX_W = 14;
+          // 从大到小排列（最内侧大片贴近 collar）
+          const sorted = [...perSide].sort((a, b) => b.weight - a.weight);
+          let platesHTML = '';
+          for (const plate of sorted) {
+            const h = Math.round(plate.diameterRatio * MAX_H);
+            const w = Math.max(4, Math.round((plate.thicknessRatio || 0.5) * MAX_W));
+            platesHTML += `<div class="barbell-plate-block" style="
+              height:${h}px;width:${w}px;background:${plate.color};
+            " title="${plate.weight}kg">${plate.weight >= 5 ? plate.weight : ''}</div>`;
+          }
           return `
-            <div class="barbell-container">
-              <div class="barbell-plate-group">${leftPlates}</div>
-              <div class="barbell-collar"></div>
-              <div class="barbell-bar" style="background:${barColor};width:${BAR_LENGTH}px;"></div>
-              <div class="barbell-collar"></div>
-              <div class="barbell-plate-group">${rightPlates}</div>
+            <div class="barbell-wrap">
+              <div class="barbell-row">
+                <div class="barbell-plates">${platesHTML}</div>
+                <div class="barbell-collar-block"></div>
+                <div class="barbell-bar-end" style="background:${barColor};"></div>
+              </div>
+              <div class="barbell-info">
+                <strong>${targetWeight}kg</strong> · 每侧 ${formatPlateList(perSide)}
+              </div>
             </div>
-            <div class="barbell-label">${targetWeight}kg · 每侧 ${formatPlateList(perSide)}</div>
           `;
         }
 
@@ -988,14 +1012,17 @@
             const slot = ex.slots.find(s => s.day === dayType);
             if (!slot) continue;
 
-            // 卧推/推举交替：Volume Day 只做副项，Intensity Day 只做主项
-            if (dayType === 'intensity') {
-              if (ex.name === '卧推' && !benchIsIntensity) continue;
-              if (ex.name === '推举' && benchIsIntensity) continue;
-            }
-            if (dayType === 'volume') {
-              if (ex.name === '卧推' && benchIsIntensity && slot.isPR) continue;
-              if (ex.name === '推举' && !benchIsIntensity && slot.isPR) continue;
+            // 卧推/推举交替：Volume 只做副项，Recovery+Intensity 只做主项
+            if (ex.name === '卧推' || ex.name === '推举') {
+              if (dayType === 'volume') {
+                // Volume Day: 只有副项做容量（主项跳过）
+                if (ex.name === '卧推' && benchIsIntensity) continue;
+                if (ex.name === '推举' && !benchIsIntensity) continue;
+              } else if (dayType === 'recovery' || dayType === 'intensity') {
+                // Recovery + Intensity: 只有主项（副项跳过）
+                if (ex.name === '卧推' && !benchIsIntensity) continue;
+                if (ex.name === '推举' && benchIsIntensity) continue;
+              }
             }
 
             // 获取基准重量：优先历史数据，其次 5RM
@@ -1084,21 +1111,31 @@
             name: '经典德州',
             startingWeights: { '深蹲': null, '卧推': null, '推举': null, '硬拉': null },
             exercises: [
+              // 深蹲 — 三天都练
               { name: '深蹲', category: 'core', slots: [
                 { day: 'volume', sets: 5, reps: 5, percentageOf: 'intensityDay', percentage: 90 },
                 { day: 'recovery', sets: 2, reps: 5, percentageOf: 'volumeDay', percentage: 80 },
                 { day: 'intensity', sets: 1, reps: 5, isPR: true }
               ]},
+              // 卧推 — 主项周: Recovery轻量+Intensity冲PR; 副项周: Volume容量
               { name: '卧推', category: 'core', slots: [
                 { day: 'volume', sets: 5, reps: 5, percentageOf: 'intensityDay', percentage: 90 },
+                { day: 'recovery', sets: 3, reps: 5, percentageOf: 'intensityDay', percentage: 85 },
                 { day: 'intensity', sets: 1, reps: 5, isPR: true }
               ]},
+              // 推举 — 与卧推交替主副项
               { name: '推举', category: 'core', slots: [
                 { day: 'volume', sets: 5, reps: 5, percentageOf: 'intensityDay', percentage: 90 },
+                { day: 'recovery', sets: 3, reps: 5, percentageOf: 'intensityDay', percentage: 85 },
                 { day: 'intensity', sets: 1, reps: 5, isPR: true }
               ]},
+              // 硬拉 — 仅 Intensity Day
               { name: '硬拉', category: 'core', slots: [
                 { day: 'intensity', sets: 1, reps: 5, isPR: true }
+              ]},
+              // 划船 — Volume Day 第五大项
+              { name: '划船', category: 'core', slots: [
+                { day: 'volume', sets: 3, reps: 8 }
               ]}
             ]
           };
@@ -1119,11 +1156,6 @@
             lastWeekSummary: null,
             showOnboarding: false,
             startingWeights: { '深蹲': null, '卧推': null, '推举': null, '硬拉': null },
-            accessoryOptions: [
-              { name: '划船', selected: false },
-              { name: '高翻', selected: false },
-              { name: '引体向上', selected: false }
-            ],
             onboardingVolumePct: 90,
 
             async init() {
@@ -1390,24 +1422,14 @@
               const tmpl = await db.templates.toCollection().first();
               const hasStartingWeights = tmpl && tmpl.startingWeights
                 && Object.values(tmpl.startingWeights).some(w => w);
-              if (!tmpl || (tmpl.name === '经典德州' && tmpl.exercises.length === 4 && !hasStartingWeights)) {
+              if (!tmpl || !hasStartingWeights) {
                 this.showOnboarding = true;
               }
             },
 
             async completeOnboarding() {
               try {
-                const selectedAccessories = this.accessoryOptions.filter(a => a.selected);
                 const exercises = JSON.parse(JSON.stringify(this.template.exercises));
-                for (const acc of selectedAccessories) {
-                  exercises.push({
-                    name: acc.name, category: 'accessory',
-                    slots: [
-                      { day: 'volume', sets: 3, reps: 8 },
-                      { day: 'recovery', sets: 3, reps: 10 }
-                    ]
-                  });
-                }
                 for (const ex of exercises) {
                   for (const slot of ex.slots) {
                     if (slot.day === 'volume' && slot.percentageOf === 'intensityDay') {
