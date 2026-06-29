@@ -414,6 +414,29 @@
                 </div>
               </div>
 
+              <!-- 上周回顾 -->
+              <details x-show="lastWeekSummary" style="margin-bottom:12px;">
+                <summary style="cursor:pointer;font-weight:600;font-size:14px;padding:4px 0;">
+                  📊 上周回顾（第 <span x-text="lastWeekSummary.weekNumber"></span> 周）
+                </summary>
+                <div style="padding:8px 0;font-size:13px;">
+                  <template x-for="day in lastWeekSummary.days" :key="day.date">
+                    <div style="display:flex;align-items:center;gap:8px;padding:4px 0;border-bottom:1px solid var(--border);">
+                      <span class="badge"
+                            :class="{ 'badge-volume': day.dayType === 'volume',
+                                      'badge-recovery': day.dayType === 'recovery',
+                                      'badge-intensity': day.dayType === 'intensity' }"
+                            x-text="day.dayType === 'volume' ? 'V' : day.dayType === 'recovery' ? 'R' : 'I'"
+                            style="font-size:10px;min-width:20px;text-align:center;"></span>
+                      <span style="min-width:80px;font-size:12px;" x-text="day.date"></span>
+                      <span :style="{color: day.completed ? 'var(--success)' : 'var(--danger)'}"
+                            x-text="day.completed ? '✅ 已完成' : '❌ 未完成'"></span>
+                      <span style="font-size:11px;color:var(--text-secondary);" x-text="day.detail"></span>
+                    </div>
+                  </template>
+                </div>
+              </details>
+
               <template x-for="(day, di) in currentWeekPlan.days" :key="di">
                 <div class="card">
                   <div class="card-header">
@@ -529,6 +552,8 @@
                               <option value="9">9</option><option value="9.5">9.5</option>
                               <option value="10">10</option>
                             </select>
+                            <input type="text" class="form-input" style="width:80px;padding:4px;font-size:11px;"
+                                   x-model="set.notes" placeholder="备注">
                           </div>
                         </template>
                       </div>
@@ -917,6 +942,16 @@
             const slot = ex.slots.find(s => s.day === dayType);
             if (!slot) continue;
 
+            // 卧推/推举交替：Volume Day 只做副项，Intensity Day 只做主项
+            if (dayType === 'intensity') {
+              if (ex.name === '卧推' && !benchIsIntensity) continue;
+              if (ex.name === '推举' && benchIsIntensity) continue;
+            }
+            if (dayType === 'volume') {
+              if (ex.name === '卧推' && benchIsIntensity && slot.isPR) continue;
+              if (ex.name === '推举' && !benchIsIntensity && slot.isPR) continue;
+            }
+
             let targetWeight = null;
             if (slot.isPR) {
               const last = lastIntensityWeights[ex.name];
@@ -1029,6 +1064,7 @@
             trainingNotes: '',
             exerciseSetsData: [],
             historyLogs: [],
+            lastWeekSummary: null,
             showOnboarding: false,
             accessoryOptions: [
               { name: '划船', selected: false },
@@ -1125,6 +1161,33 @@
             async loadCurrentPlan() {
               const plans = await db.weekPlans.orderBy('weekNumber').reverse().toArray();
               this.currentWeekPlan = plans.find(p => !p.completed) || (plans.length > 0 ? plans[0] : null);
+              // 加载上周回顾
+              this.lastWeekSummary = null;
+              if (plans.length >= 2) {
+                const lastWeek = plans[1]; // plans[0] is current, plans[1] is last
+                const logs = await db.trainingLogs
+                  .where('dayPlanId').anyOf(lastWeek.days.map(d => d.id)).toArray();
+                const daySummaries = lastWeek.days.map(day => {
+                  const log = logs.find(l => l.dayPlanId === day.id);
+                  let totalSets = 0, completedSets = 0;
+                  const failedExercises = [];
+                  if (log) {
+                    for (const ex of log.exercises) {
+                      for (const s of ex.sets) {
+                        totalSets++;
+                        if (s.completed) completedSets++; else failedExercises.push(ex.name);
+                      }
+                    }
+                  }
+                  return {
+                    date: day.date,
+                    dayType: day.dayType,
+                    completed: log ? (completedSets === totalSets && totalSets > 0) : false,
+                    detail: log ? (completedSets + '/' + totalSets + ' 组完成') : '未训练'
+                  };
+                });
+                this.lastWeekSummary = { weekNumber: lastWeek.weekNumber, days: daySummaries };
+              }
             },
 
             async loadTodayTraining() {
