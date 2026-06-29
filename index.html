@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="theme-color" content="#1a1a2e">
-    <link rel="manifest" href="/manifest.json">
+    <link rel="manifest" href="manifest.json">
     <title>德州训练法 · 训练追踪</title>
     <style>
         /* ===== CSS Custom Properties ===== */
@@ -300,7 +300,7 @@
         </div>
 
         <!-- ===== View: 训练 ===== -->
-        <div class="view" :class="{ 'active': activeTab === 'workout' }">
+        <div class="view" :class="{ 'active': activeTab === 'train' }">
             <div class="empty-state">
                 <div class="empty-icon">&#127931;&#65039;</div>
                 <div class="empty-title">当前训练</div>
@@ -328,19 +328,19 @@
 
         <!-- ===== Bottom Tab Navigation ===== -->
         <nav class="tab-nav">
-            <button class="tab-btn" :class="{ 'active': activeTab === 'plan' }" @click="activeTab = 'plan'">
+            <button type="button" class="tab-btn" :class="{ 'active': activeTab === 'plan' }" @click="activeTab = 'plan'">
                 <span class="tab-icon">&#128203;</span>
                 <span class="tab-label">计划</span>
             </button>
-            <button class="tab-btn" :class="{ 'active': activeTab === 'workout' }" @click="activeTab = 'workout'">
+            <button type="button" class="tab-btn" :class="{ 'active': activeTab === 'train' }" @click="activeTab = 'train'">
                 <span class="tab-icon">&#127931;&#65039;</span>
                 <span class="tab-label">训练</span>
             </button>
-            <button class="tab-btn" :class="{ 'active': activeTab === 'history' }" @click="activeTab = 'history'">
+            <button type="button" class="tab-btn" :class="{ 'active': activeTab === 'history' }" @click="activeTab = 'history'">
                 <span class="tab-icon">&#128220;</span>
                 <span class="tab-label">历史</span>
             </button>
-            <button class="tab-btn" :class="{ 'active': activeTab === 'settings' }" @click="activeTab = 'settings'">
+            <button type="button" class="tab-btn" :class="{ 'active': activeTab === 'settings' }" @click="activeTab = 'settings'">
                 <span class="tab-icon">&#9881;&#65039;</span>
                 <span class="tab-label">设置</span>
             </button>
