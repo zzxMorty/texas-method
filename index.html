@@ -370,7 +370,7 @@
         <div x-show="showOnboarding" x-cloak style="position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:200;display:flex;align-items:center;justify-content:center;">
           <div class="card" style="max-width:400px;width:90%;max-height:80vh;overflow-y:auto;">
             <h3 style="margin-bottom:12px;">🏋️ 欢迎使用德州训练法</h3>
-            <p style="font-size:13px;color:var(--text-secondary);margin-bottom:16px;">五大核心动作：深蹲 · 卧推 · 推举 · 硬拉 · 划船</p>
+            <p style="font-size:13px;color:var(--text-secondary);margin-bottom:16px;">五大核心动作：深蹲 · 卧推 · 硬拉 · 实力推 · 划船</p>
             <div class="form-group">
               <label class="form-label">Volume Day 百分比 (%)</label>
               <input type="number" class="form-input" x-model.number="onboardingVolumePct" step="1" min="60" max="100">
@@ -378,25 +378,19 @@
             </div>
 
             <div class="form-group">
-              <label class="form-label">🏆 核心动作起始 5RM (kg)</label>
-              <span style="font-size:11px;color:var(--text-secondary);">填写你能完成 5 次的最大重量，系统自动计算所有训练重量</span>
+              <label class="form-label">🏆 核心动作 5RM (kg)</label>
+              <span style="font-size:11px;color:var(--text-secondary);">填写各动作 5 次最大重量，系统自动算全部训练重量</span>
               <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px;">
-                <div>
-                  <span style="font-size:12px;">深蹲</span>
-                  <input type="number" class="form-input" x-model.number="startingWeights['深蹲']" step="2.5" min="0" placeholder="kg">
-                </div>
-                <div>
-                  <span style="font-size:12px;">卧推</span>
-                  <input type="number" class="form-input" x-model.number="startingWeights['卧推']" step="2.5" min="0" placeholder="kg">
-                </div>
-                <div>
-                  <span style="font-size:12px;">推举</span>
-                  <input type="number" class="form-input" x-model.number="startingWeights['推举']" step="2.5" min="0" placeholder="kg">
-                </div>
-                <div>
-                  <span style="font-size:12px;">硬拉</span>
-                  <input type="number" class="form-input" x-model.number="startingWeights['硬拉']" step="2.5" min="0" placeholder="kg">
-                </div>
+                <div><span style="font-size:12px;">深蹲</span>
+                  <input type="number" class="form-input" x-model.number="startingWeights['深蹲']" step="2.5" min="0" placeholder="kg"></div>
+                <div><span style="font-size:12px;">卧推</span>
+                  <input type="number" class="form-input" x-model.number="startingWeights['卧推']" step="2.5" min="0" placeholder="kg"></div>
+                <div><span style="font-size:12px;">硬拉</span>
+                  <input type="number" class="form-input" x-model.number="startingWeights['硬拉']" step="2.5" min="0" placeholder="kg"></div>
+                <div><span style="font-size:12px;">实力推</span>
+                  <input type="number" class="form-input" x-model.number="startingWeights['实力推']" step="2.5" min="0" placeholder="kg"></div>
+                <div style="grid-column:1/-1;"><span style="font-size:12px;">划船</span>
+                  <input type="number" class="form-input" x-model.number="startingWeights['划船']" step="2.5" min="0" placeholder="kg"></div>
               </div>
             </div>
 
@@ -437,6 +431,9 @@
               <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
                 <div>
                   <span style="font-weight:600;" x-text="'第 ' + currentWeekPlan.weekNumber + ' 周'"></span>
+                  <span class="badge" style="margin-left:8px;"
+                        :class="currentWeekPlan.weekType === 'A' ? 'badge-volume' : 'badge-intensity'"
+                        x-text="currentWeekPlan.weekType + ' 周'"></span>
                   <span style="font-size:12px;color:var(--text-secondary);margin-left:8px;"
                         x-text="currentWeekPlan.confirmed ? '✅ 已确认' : '⚠️ 待确认'"></span>
                 </div>
@@ -675,6 +672,34 @@
         <!-- ===== View: 设置 ===== -->
         <div class="view" :class="{ 'active': activeTab === 'settings' }">
           <h2 style="padding:8px 0 16px;">⚙️ 设置</h2>
+
+          <!-- 5RM 管理 -->
+          <div class="card">
+            <div class="card-header"><span class="card-title">🏆 核心动作 5RM (kg)</span></div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+              <div class="form-group" style="margin-bottom:8px;">
+                <label class="form-label">深蹲</label>
+                <input type="number" class="form-input" x-model.number="startingWeights['深蹲']" step="2.5" min="0">
+              </div>
+              <div class="form-group" style="margin-bottom:8px;">
+                <label class="form-label">卧推</label>
+                <input type="number" class="form-input" x-model.number="startingWeights['卧推']" step="2.5" min="0">
+              </div>
+              <div class="form-group" style="margin-bottom:8px;">
+                <label class="form-label">硬拉</label>
+                <input type="number" class="form-input" x-model.number="startingWeights['硬拉']" step="2.5" min="0">
+              </div>
+              <div class="form-group" style="margin-bottom:8px;">
+                <label class="form-label">实力推</label>
+                <input type="number" class="form-input" x-model.number="startingWeights['实力推']" step="2.5" min="0">
+              </div>
+              <div class="form-group" style="margin-bottom:8px;">
+                <label class="form-label">划船</label>
+                <input type="number" class="form-input" x-model.number="startingWeights['划船']" step="2.5" min="0">
+              </div>
+            </div>
+            <button type="button" class="btn btn-primary btn-sm" @click="save5RM()">保存 5RM</button>
+          </div>
 
           <!-- 训练偏好 -->
           <div class="card">
@@ -942,14 +967,10 @@
           const day2Date = getNextDate(settings.dayPreferences.day2, new Date(day1Date));
           const day3Date = getNextDate(settings.dayPreferences.day3, new Date(day2Date));
 
-          let benchIsIntensity = true;
-          if (lastWeekPlan) {
-            const lastIntensity = lastWeekPlan.days.find(d => d.dayType === 'intensity');
-            if (lastIntensity) {
-              const hasBenchPR = lastIntensity.exercises.some(e => e.name === '卧推' && e.isPR);
-              benchIsIntensity = !hasBenchPR;
-            }
-          }
+          // AB 周交替: A周卧推主项, B周实力推主项
+          const lastWeekNumber = lastWeekPlan ? lastWeekPlan.weekNumber : 0;
+          const thisWeekNumber = lastWeekNumber + 1;
+          const isAWeek = (thisWeekNumber % 2 === 1); // 奇数周=A, 偶数周=B
 
           const lastIntensityWeights = {};
           if (lastWeekPlan && lastWeekTrainingLogs.length > 0) {
@@ -973,7 +994,7 @@
           const startingWeights = template.startingWeights || {};
 
           // Build Volume Day first (needed for Recovery Day calculations)
-          const volumeDay = buildDayPlan(template, 'volume', day1Date, benchIsIntensity,
+          const volumeDay = buildDayPlan(template, 'volume', day1Date, isAWeek,
             lastIntensityWeights, startingWeights, null, settings);
           volumeDay.id = dayIdBase;
 
@@ -984,20 +1005,20 @@
           }
 
           // Build Recovery Day (uses Volume weights)
-          const recoveryDay = buildDayPlan(template, 'recovery', day2Date, benchIsIntensity,
+          const recoveryDay = buildDayPlan(template, 'recovery', day2Date, isAWeek,
             lastIntensityWeights, startingWeights, volumeWeights, settings);
           recoveryDay.id = dayIdBase + 1;
 
           // Build Intensity Day
-          const intensityDay = buildDayPlan(template, 'intensity', day3Date, benchIsIntensity,
+          const intensityDay = buildDayPlan(template, 'intensity', day3Date, isAWeek,
             lastIntensityWeights, startingWeights, null, settings);
           intensityDay.id = dayIdBase + 2;
 
           const days = [volumeDay, recoveryDay, intensityDay];
 
-          const lastWeekNumber = lastWeekPlan ? lastWeekPlan.weekNumber : 0;
           return {
-            weekNumber: lastWeekNumber + 1,
+            weekNumber: thisWeekNumber,
+            weekType: isAWeek ? 'A' : 'B',
             startDate: weekStart,
             confirmed: false,
             completed: false,
@@ -1005,23 +1026,25 @@
           };
         }
 
-        function buildDayPlan(template, dayType, date, benchIsIntensity, lastIntensityWeights, startingWeights, volumeWeights, settings) {
+        function buildDayPlan(template, dayType, date, isAWeek, lastIntensityWeights, startingWeights, volumeWeights, settings) {
           const exercises = [];
 
           for (const ex of template.exercises) {
             const slot = ex.slots.find(s => s.day === dayType);
             if (!slot) continue;
 
-            // 卧推/推举交替：Volume 只做副项，Recovery+Intensity 只做主项
-            if (ex.name === '卧推' || ex.name === '推举') {
-              if (dayType === 'volume') {
-                // Volume Day: 只有副项做容量（主项跳过）
-                if (ex.name === '卧推' && benchIsIntensity) continue;
-                if (ex.name === '推举' && !benchIsIntensity) continue;
-              } else if (dayType === 'recovery' || dayType === 'intensity') {
-                // Recovery + Intensity: 只有主项（副项跳过）
-                if (ex.name === '卧推' && !benchIsIntensity) continue;
-                if (ex.name === '推举' && benchIsIntensity) continue;
+            // AB周交替：主项上 Volume+Intensity，副项上 Recovery
+            // A周(卧推主项): Volume=卧推, Recovery=实力推, Intensity=卧推
+            // B周(实力推主项): Volume=实力推, Recovery=卧推, Intensity=实力推
+            if (ex.name === '卧推' || ex.name === '实力推') {
+              if (dayType === 'volume' || dayType === 'intensity') {
+                // Volume + Intensity: 只有主项
+                if (ex.name === '卧推' && !isAWeek) continue;  // B周卧推是副项
+                if (ex.name === '实力推' && isAWeek) continue; // A周实力推是副项
+              } else if (dayType === 'recovery') {
+                // Recovery: 只有副项（轻量练习）
+                if (ex.name === '卧推' && isAWeek) continue;   // A周卧推是主项
+                if (ex.name === '实力推' && !isAWeek) continue; // B周实力推是主项
               }
             }
 
@@ -1061,14 +1084,14 @@
 
         function getExerciseCategory(name) {
           const lower = ['深蹲', '硬拉'];
-          const upper = ['卧推', '推举'];
+          const upper = ['卧推', '实力推'];
           if (lower.includes(name)) return 'lower';
           if (upper.includes(name)) return 'upper';
-          return 'accessory';
+          return 'pull'; // 划船等拉力动作
         }
 
         function getExerciseDefaultWeight(name) {
-          const defaults = { '深蹲': 100, '卧推': 70, '推举': 45, '硬拉': 120 };
+          const defaults = { '深蹲': 100, '卧推': 70, '实力推': 45, '硬拉': 120, '划船': 60 };
           return defaults[name] || 40;
         }
 
@@ -1109,7 +1132,7 @@
         function getDefaultTemplate() {
           return {
             name: '经典德州',
-            startingWeights: { '深蹲': null, '卧推': null, '推举': null, '硬拉': null },
+            startingWeights: { '深蹲': null, '卧推': null, '硬拉': null, '实力推': null, '划船': null },
             exercises: [
               // 深蹲 — 三天都练
               { name: '深蹲', category: 'core', slots: [
@@ -1117,14 +1140,8 @@
                 { day: 'recovery', sets: 2, reps: 5, percentageOf: 'volumeDay', percentage: 80 },
                 { day: 'intensity', sets: 1, reps: 5, isPR: true }
               ]},
-              // 卧推 — 主项周: Recovery轻量+Intensity冲PR; 副项周: Volume容量
+              // 卧推 — A周主项 (Volume容量+Intensity冲PR), B周副项 (Recovery轻量)
               { name: '卧推', category: 'core', slots: [
-                { day: 'volume', sets: 5, reps: 5, percentageOf: 'intensityDay', percentage: 90 },
-                { day: 'recovery', sets: 3, reps: 5, percentageOf: 'intensityDay', percentage: 85 },
-                { day: 'intensity', sets: 1, reps: 5, isPR: true }
-              ]},
-              // 推举 — 与卧推交替主副项
-              { name: '推举', category: 'core', slots: [
                 { day: 'volume', sets: 5, reps: 5, percentageOf: 'intensityDay', percentage: 90 },
                 { day: 'recovery', sets: 3, reps: 5, percentageOf: 'intensityDay', percentage: 85 },
                 { day: 'intensity', sets: 1, reps: 5, isPR: true }
@@ -1133,9 +1150,15 @@
               { name: '硬拉', category: 'core', slots: [
                 { day: 'intensity', sets: 1, reps: 5, isPR: true }
               ]},
-              // 划船 — Volume Day 第五大项
+              // 实力推 — B周主项 (Volume容量+Intensity冲PR), A周副项 (Recovery轻量)
+              { name: '实力推', category: 'core', slots: [
+                { day: 'volume', sets: 5, reps: 5, percentageOf: 'intensityDay', percentage: 90 },
+                { day: 'recovery', sets: 3, reps: 5, percentageOf: 'intensityDay', percentage: 85 },
+                { day: 'intensity', sets: 1, reps: 5, isPR: true }
+              ]},
+              // 划船 — Volume Day 5×5
               { name: '划船', category: 'core', slots: [
-                { day: 'volume', sets: 3, reps: 8 }
+                { day: 'volume', sets: 5, reps: 5 }
               ]}
             ]
           };
@@ -1155,7 +1178,7 @@
             historyLogs: [],
             lastWeekSummary: null,
             showOnboarding: false,
-            startingWeights: { '深蹲': null, '卧推': null, '推举': null, '硬拉': null },
+            startingWeights: { '深蹲': null, '卧推': null, '硬拉': null, '实力推': null, '划船': null },
             onboardingVolumePct: 90,
 
             async init() {
@@ -1167,9 +1190,9 @@
               } else {
                 this.template = tmpl;
               }
-              // 同步模板中的 5RM 数据
+              // 同步模板中的 5RM 数据（合并，保留默认键）
               if (this.template.startingWeights) {
-                this.startingWeights = this.template.startingWeights;
+                Object.assign(this.startingWeights, this.template.startingWeights);
               }
               await this.loadCurrentPlan();
               await this.checkOnboardingNeeded();
@@ -1182,6 +1205,14 @@
                   console.log('SW registration skipped (file:// protocol):', e.message);
                 }
               }
+            },
+
+            async save5RM() {
+              if (!this.template || !this.template.id) return;
+              const sw = JSON.parse(JSON.stringify(this.startingWeights));
+              await db.templates.update(this.template.id, { startingWeights: sw });
+              this.template.startingWeights = sw;
+              alert('5RM 已保存 ✓');
             },
 
             async saveSettings() {
