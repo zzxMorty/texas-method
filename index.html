@@ -5,6 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="theme-color" content="#1a1a2e">
     <link rel="manifest" href="manifest.json">
+    <link rel="apple-touch-icon" href="icons/icon-192.png">
+    <link rel="apple-touch-icon" sizes="512x512" href="icons/icon-512.png">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-title" content="德州训练">
     <title>德州训练法 · 训练追踪</title>
     <style>
         /* ===== CSS Custom Properties ===== */
@@ -423,7 +427,10 @@
           <div x-show="!currentWeekPlan" class="empty-state">
             <div class="empty-icon">📋</div>
             <p style="margin-bottom:16px;">还没有训练计划</p>
-            <button type="button" class="btn btn-primary" @click="createNewWeekPlan()">生成新一周计划</button>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center;">
+              <button type="button" class="btn btn-primary" @click="createNewWeekPlan(true)">📅 生成本周计划</button>
+              <button type="button" class="btn btn-outline" @click="createNewWeekPlan(false)">📆 生成下周计划</button>
+            </div>
           </div>
 
           <template x-if="currentWeekPlan">
@@ -438,7 +445,7 @@
                         x-text="currentWeekPlan.confirmed ? '✅ 已确认' : '⚠️ 待确认'"></span>
                 </div>
                 <div style="display:flex;gap:8px;">
-                  <button type="button" class="btn btn-sm btn-outline" @click="createNewWeekPlan()"
+                  <button type="button" class="btn btn-sm btn-outline" @click="createNewWeekPlan(false)"
                           x-show="currentWeekPlan.confirmed && currentWeekPlan.completed">生成下周</button>
                   <button type="button" class="btn btn-sm btn-primary" @click="confirmWeekPlan()"
                           x-show="!currentWeekPlan.confirmed">确认计划</button>
@@ -958,14 +965,36 @@
           return d.toISOString().split('T')[0];
         }
 
-        function generateWeekPlan(template, settings, lastWeekPlan, lastWeekTrainingLogs) {
+        // 获取本周内的指定星期几（可能已过，可能在将来）
+        function getThisWeekDate(dayOfWeek) {
+          const d = new Date();
+          const today = d.getDay();
+          // 计算本周一的日期偏移
+          const mondayOffset = today === 0 ? -6 : 1 - today;
+          const monday = new Date(d);
+          monday.setDate(d.getDate() + mondayOffset);
+          // 周一到周六: dayOfWeek-1, 周日(0): +6
+          const daysFromMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+          const target = new Date(monday);
+          target.setDate(monday.getDate() + daysFromMonday);
+          return target.toISOString().split('T')[0];
+        }
+
+        function generateWeekPlan(template, settings, lastWeekPlan, lastWeekTrainingLogs, useThisWeek) {
           const now = new Date();
           const weekStart = now.toISOString().split('T')[0];
           const dayIdBase = Date.now();
 
-          const day1Date = getNextDate(settings.dayPreferences.day1, new Date(Date.now() - 86400000));
-          const day2Date = getNextDate(settings.dayPreferences.day2, new Date(day1Date));
-          const day3Date = getNextDate(settings.dayPreferences.day3, new Date(day2Date));
+          // 根据本周/下周选择不同的日期计算方式
+          const day1Date = useThisWeek
+            ? getThisWeekDate(settings.dayPreferences.day1)
+            : getNextDate(settings.dayPreferences.day1, new Date(Date.now() - 86400000));
+          const day2Date = useThisWeek
+            ? getThisWeekDate(settings.dayPreferences.day2)
+            : getNextDate(settings.dayPreferences.day2, new Date(day1Date));
+          const day3Date = useThisWeek
+            ? getThisWeekDate(settings.dayPreferences.day3)
+            : getNextDate(settings.dayPreferences.day3, new Date(day2Date));
 
           // AB 周交替: A周卧推主项, B周实力推主项
           const lastWeekNumber = lastWeekPlan ? lastWeekPlan.weekNumber : 0;
@@ -1156,9 +1185,9 @@
                 { day: 'recovery', sets: 3, reps: 5, percentageOf: 'intensityDay', percentage: 85 },
                 { day: 'intensity', sets: 1, reps: 5, isPR: true }
               ]},
-              // 划船 — Volume Day 5×5
+              // 划船 — Volume Day 5×5 (基于5RM的90%)
               { name: '划船', category: 'core', slots: [
-                { day: 'volume', sets: 5, reps: 5 }
+                { day: 'volume', sets: 5, reps: 5, percentageOf: 'intensityDay', percentage: 90 }
               ]}
             ]
           };
@@ -1246,7 +1275,7 @@
               location.reload();
             },
 
-            async createNewWeekPlan() {
+            async createNewWeekPlan(useThisWeek) {
               let lastWeekPlan = null;
               let lastWeekLogs = [];
               const allPlans = await db.weekPlans.orderBy('weekNumber').reverse().toArray();
@@ -1257,7 +1286,7 @@
                   .anyOf(lastWeekPlan.days.map(d => d.id))
                   .toArray();
               }
-              const plan = generateWeekPlan(this.template, this.settings, lastWeekPlan, lastWeekLogs);
+              const plan = generateWeekPlan(this.template, this.settings, lastWeekPlan, lastWeekLogs, !!useThisWeek);
               const id = await db.weekPlans.add(plan);
               plan.id = id;
               this.currentWeekPlan = plan;
