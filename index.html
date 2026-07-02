@@ -1148,6 +1148,15 @@
           ui: { showBarbellPreview: true }
         };
 
+        // ===== Persistence Helper =====
+        // Strip Alpine.js reactive proxies before storing to IndexedDB.
+        // Without this, proxy-wrapped objects can cause structured-clone
+        // issues in some browsers, silently corrupting IndexedDB records.
+        function toPlainObject(obj) {
+          if (obj === null || obj === undefined) return obj;
+          try { return JSON.parse(JSON.stringify(obj)); } catch (e) { return obj; }
+        }
+
         async function getSettings() {
           let s = await db.settings.toCollection().first();
           if (!s) {
@@ -1276,21 +1285,38 @@
             },
 
             async createNewWeekPlan(useThisWeek) {
-              let lastWeekPlan = null;
-              let lastWeekLogs = [];
-              const allPlans = await db.weekPlans.orderBy('weekNumber').reverse().toArray();
-              if (allPlans.length > 0) {
-                lastWeekPlan = allPlans[0];
-                lastWeekLogs = await db.trainingLogs
-                  .where('dayPlanId')
-                  .anyOf(lastWeekPlan.days.map(d => d.id))
-                  .toArray();
+              try {
+                if (!this.template || !this.settings) {
+                  alert('应用尚未初始化完成，请稍后再试');
+                  return;
+                }
+                let lastWeekPlan = null;
+                let lastWeekLogs = [];
+                const allPlans = await db.weekPlans.orderBy('weekNumber').reverse().toArray();
+                if (allPlans.length > 0) {
+                  lastWeekPlan = toPlainObject(allPlans[0]);
+                  lastWeekLogs = await db.trainingLogs
+                    .where('dayPlanId')
+                    .anyOf(lastWeekPlan.days.map(d => d.id))
+                    .toArray();
+                  // Ensure lastWeekLogs are plain objects too
+                  lastWeekLogs = toPlainObject(lastWeekLogs);
+                }
+                // Strip Alpine proxies from template & settings before generating plan
+                const plainTemplate = toPlainObject(this.template);
+                const plainSettings = toPlainObject(this.settings);
+                const plan = generateWeekPlan(plainTemplate, plainSettings, lastWeekPlan, lastWeekLogs, !!useThisWeek);
+                // Serialize before storing to avoid proxy contamination in IndexedDB
+                const safePlan = toPlainObject(plan);
+                const id = await db.weekPlans.add(safePlan);
+                safePlan.id = id;
+                this.currentWeekPlan = safePlan;
+                this.activeTab = 'plan';
+                console.log('[DB] Week plan created and saved', { id, weekNumber: safePlan.weekNumber });
+              } catch (e) {
+                console.error('[DB] createNewWeekPlan failed:', e);
+                alert('创建计划失败：' + (e.message || '未知错误') + '\n请尝试刷新页面后重试');
               }
-              const plan = generateWeekPlan(this.template, this.settings, lastWeekPlan, lastWeekLogs, !!useThisWeek);
-              const id = await db.weekPlans.add(plan);
-              plan.id = id;
-              this.currentWeekPlan = plan;
-              this.activeTab = 'plan';
             },
 
             async confirmWeekPlan() {
@@ -1303,39 +1329,69 @@
                   }
                 }
               }
-              this.currentWeekPlan.confirmed = true;
-              await db.weekPlans.update(this.currentWeekPlan.id, { confirmed: true, days: this.currentWeekPlan.days });
+              try {
+                this.currentWeekPlan.confirmed = true;
+                // Serialize days to plain objects before storing — Alpine proxy
+                // contamination is the #1 cause of IndexedDB corruption here.
+                const safeDays = toPlainObject(this.currentWeekPlan.days);
+                await db.weekPlans.update(this.currentWeekPlan.id, { confirmed: true, days: safeDays });
+                console.log('[DB] Week plan confirmed', { id: this.currentWeekPlan.id });
+              } catch (e) {
+                console.error('[DB] confirmWeekPlan failed:', e);
+                this.currentWeekPlan.confirmed = false;
+                alert('确认计划失败：' + (e.message || '未知错误') + '\n请尝试刷新页面后重试');
+              }
             },
 
             async loadCurrentPlan() {
-              const plans = await db.weekPlans.orderBy('weekNumber').reverse().toArray();
-              this.currentWeekPlan = plans.find(p => !p.completed) || (plans.length > 0 ? plans[0] : null);
-              // 加载上周回顾
-              this.lastWeekSummary = null;
-              if (plans.length >= 2) {
-                const lastWeek = plans[1]; // plans[0] is current, plans[1] is last
-                const logs = await db.trainingLogs
-                  .where('dayPlanId').anyOf(lastWeek.days.map(d => d.id)).toArray();
-                const daySummaries = lastWeek.days.map(day => {
-                  const log = logs.find(l => l.dayPlanId === day.id);
-                  let totalSets = 0, completedSets = 0;
-                  const failedExercises = [];
-                  if (log) {
-                    for (const ex of log.exercises) {
-                      for (const s of ex.sets) {
-                        totalSets++;
-                        if (s.completed) completedSets++; else failedExercises.push(ex.name);
+              try {
+                const plans = await db.weekPlans.orderBy('weekNumber').reverse().toArray();
+                console.log('[DB] loadCurrentPlan: found', plans.length, 'plans');
+                const found = plans.find(p => !p.completed);
+                this.currentWeekPlan = found || (plans.length > 0 ? plans[0] : null);
+                if (this.currentWeekPlan) {
+                  console.log('[DB] Current plan loaded',
+                    { id: this.currentWeekPlan.id, week: this.currentWeekPlan.weekNumber,
+                      confirmed: this.currentWeekPlan.confirmed });
+                }
+                // 加载上周回顾
+                this.lastWeekSummary = null;
+                if (plans.length >= 2) {
+                  const lastWeek = plans[1]; // plans[0] is current, plans[1] is last
+                  const logs = await db.trainingLogs
+                    .where('dayPlanId').anyOf(lastWeek.days.map(d => d.id)).toArray();
+                  const daySummaries = lastWeek.days.map(day => {
+                    const log = logs.find(l => l.dayPlanId === day.id);
+                    let totalSets = 0, completedSets = 0;
+                    const failedExercises = [];
+                    if (log) {
+                      for (const ex of log.exercises) {
+                        for (const s of ex.sets) {
+                          totalSets++;
+                          if (s.completed) completedSets++; else failedExercises.push(ex.name);
+                        }
                       }
                     }
-                  }
-                  return {
-                    date: day.date,
-                    dayType: day.dayType,
-                    completed: log ? (completedSets === totalSets && totalSets > 0) : false,
-                    detail: log ? (completedSets + '/' + totalSets + ' 组完成') : '未训练'
-                  };
-                });
-                this.lastWeekSummary = { weekNumber: lastWeek.weekNumber, days: daySummaries };
+                    return {
+                      date: day.date,
+                      dayType: day.dayType,
+                      completed: log ? (completedSets === totalSets && totalSets > 0) : false,
+                      detail: log ? (completedSets + '/' + totalSets + ' 组完成') : '未训练'
+                    };
+                  });
+                  this.lastWeekSummary = { weekNumber: lastWeek.weekNumber, days: daySummaries };
+                }
+              } catch (e) {
+                console.error('[DB] loadCurrentPlan failed:', e);
+                // Try to recover: load all plans without ordering
+                try {
+                  const allPlans = await db.weekPlans.toArray();
+                  this.currentWeekPlan = allPlans.find(p => !p.completed) || (allPlans.length > 0 ? allPlans[0] : null);
+                  console.log('[DB] Fallback: loaded', allPlans.length, 'plans');
+                } catch (e2) {
+                  console.error('[DB] Fallback also failed:', e2);
+                  this.currentWeekPlan = null;
+                }
               }
             },
 
@@ -1399,10 +1455,10 @@
                   }))
                 };
               });
-              const log = {
+              const log = toPlainObject({
                 dayPlanId: this.todayDayPlan.id, date: new Date().toISOString().split('T')[0],
                 exercises: loggedExercises, notes: this.trainingNotes
-              };
+              });
               await db.trainingLogs.add(log);
               const weekDays = this.currentWeekPlan.days;
               let allDone = true;
